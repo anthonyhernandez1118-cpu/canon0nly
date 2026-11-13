@@ -72,6 +72,109 @@ function removeShow(s){
     refreshLists();
   }});
 }
+// iOS-style bottom sheet. actions: [{label, fn, destructive}] — fn may return false to keep the sheet open.
+function sheet({title = '', message = '', body = '', actions = []}){
+  const bg = document.createElement('div');
+  bg.className = 'sheet-bg';
+  bg.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title || 'Options')}">
+    <div class="sheet-card">
+      ${title || message ? `<div class="sheet-head">${title ? `<p class="sheet-title">${esc(title)}</p>` : ''}${message ? `<p class="sheet-msg">${esc(message)}</p>` : ''}</div>` : ''}
+      ${body}
+      ${actions.map((a, i) => `<button class="sheet-btn${a.destructive ? ' destructive' : ''}" data-i="${i}">${esc(a.label)}</button>`).join('')}
+    </div>
+    <button class="sheet-btn sheet-cancel">Cancel</button>
+  </div>`;
+  const close = () => { bg.classList.remove('show'); setTimeout(() => bg.remove(), 220); };
+  bg.addEventListener('click', e => {
+    if (e.target === bg || e.target.closest('.sheet-cancel')) return close();
+    const b = e.target.closest('.sheet-btn[data-i]'); if (!b) return;
+    if (actions[+b.dataset.i].fn(bg) !== false) close();
+  });
+  document.body.appendChild(bg);
+  requestAnimationFrame(() => bg.classList.add('show'));
+  return bg;
+}
+
+// Backup codes: all watched progress packed into one copyable string.
+const packList = list => {
+  const nums = list.filter(n => /^\d+$/.test(n)).map(Number).sort((a, b) => a - b);
+  const out = []; let a = null, b = null;
+  for (const n of nums) { if (a === null) { a = b = n; } else if (n === b + 1) { b = n; } else { out.push(a === b ? a : a + '-' + b); a = b = n; } }
+  if (a !== null) out.push(a === b ? a : a + '-' + b);
+  return out.concat(list.filter(n => !/^\d+$/.test(n))).join(',');
+};
+const unpackList = str => String(str).split(',').filter(Boolean).flatMap(p => {
+  const m = p.match(/^(\d+)-(\d+)$/);
+  if (!m) return [p];
+  const out = []; for (let n = +m[1]; n <= +m[2] && out.length < 5000; n++) out.push(String(n)); return out;
+});
+function exportCode(){
+  const w = {};
+  DATA.forEach(s => { const d = store.get('w:' + s.s, []); if (d.length) w[s.s] = packList(d); });
+  const json = JSON.stringify({v: 1, w, a: store.get('activity', {}), g: guide});
+  return 'CANON1.' + btoa(unescape(encodeURIComponent(json)));
+}
+function importCode(code){
+  const raw = String(code).replace(/\s+/g, '').replace(/^CANON1\./, '');
+  let obj;
+  try { obj = JSON.parse(decodeURIComponent(escape(atob(raw)))); } catch { return -1; }
+  if (!obj || obj.v !== 1 || typeof obj.w !== 'object') return -1;
+  let n = 0;
+  const act = store.get('activity', {});
+  for (const [slug, packed] of Object.entries(obj.w)) {
+    if (!DATA.some(s => s.s === slug)) continue;
+    const set = new Set(store.get('w:' + slug, []));
+    unpackList(packed).forEach(e => set.add(e));
+    store.set('w:' + slug, [...set]); n++;
+    const t = obj.a && obj.a[slug]; if (t && (!act[slug] || t > act[slug])) act[slug] = t;
+  }
+  store.set('activity', act);
+  return n;
+}
+function copyText(txt, okMsg){
+  const fail = () => toast('Couldn’t copy. Press and hold the text to copy it.');
+  try { navigator.clipboard.writeText(txt).then(() => toast(okMsg), fail); } catch { fail(); }
+}
+function openBackup(){
+  const code = exportCode();
+  const shows = DATA.filter(s => store.get('w:' + s.s, []).length).length;
+  sheet({
+    title: 'Back up progress',
+    message: shows ? `This code holds your progress for ${shows} show${shows > 1 ? 's' : ''}. Save it in Notes or send it to yourself, then use Restore on any phone.` : 'You haven’t marked any episodes yet, so there’s nothing to back up.',
+    body: shows ? `<textarea class="code" readonly aria-label="Backup code">${esc(code)}</textarea>` : '',
+    actions: shows ? [
+      {label: 'Copy Code', fn: () => copyText(code, 'Backup code copied')},
+      ...(navigator.share ? [{label: 'Share…', fn: () => { navigator.share({title: 'Canon Only backup', text: code}).catch(() => {}); }}] : []),
+    ] : [],
+  });
+}
+function openRestore(){
+  const bg = sheet({
+    title: 'Restore from a backup',
+    message: 'Paste a backup code. It adds to the progress already on this phone and never erases anything.',
+    body: `<textarea class="code" id="restore-code" placeholder="CANON1.…" aria-label="Backup code"></textarea><p class="sheet-err" id="restore-err" hidden></p>`,
+    actions: [{label: 'Restore', fn: el => {
+      const n = importCode(el.querySelector('#restore-code').value);
+      const err = el.querySelector('#restore-err');
+      if (n < 0) { err.textContent = 'That code doesn’t look right. Copy the whole code, starting with CANON1.'; err.hidden = false; return false; }
+      toast(n ? `Restored ${n} show${n > 1 ? 's' : ''}` : 'Nothing new to restore');
+      refreshLists();
+    }}],
+  });
+  setTimeout(() => bg.querySelector('#restore-code')?.focus(), 250);
+}
+
+// Share a link that opens straight to a show.
+const SHARE_BASE = 'https://anthonyhernandez1118-cpu.github.io/canon0nly/';
+function shareShow(s){
+  const url = SHARE_BASE + '#' + hashFor(s);
+  const n = s.e.filter(e => keep(s, e)).length;
+  const text = `${s.n} without the filler: ${n} of ${s.e.length} episodes.`;
+  const copy = () => copyText(url, 'Link copied');
+  if (navigator.share) navigator.share({title: `${s.n} · Canon Only`, text, url}).catch(err => { if (err && err.name !== 'AbortError') copy(); });
+  else copy();
+}
+
 function refreshLists(){
   if (!$('#v-home').hidden) renderHome();
   if (!$('#v-watching').hidden) renderWatching();
@@ -163,11 +266,13 @@ $('#home-search').onclick = () => { goTab('search'); setTimeout(() => $('#q').fo
 
 /* ---------- watching ---------- */
 let editWatching = false;
+const SHARE_ICON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M8 10H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2"/></svg>';
 function updateNavAct(name){
   const b = $('#nav-act');
+  if (name === 'show') { b.hidden = false; b.innerHTML = SHARE_ICON; b.setAttribute('aria-label', 'Share this show'); return; }
   const show = name === 'watching' && started().length > 0;
   if (!show) editWatching = false;
-  b.hidden = !show; b.textContent = editWatching ? 'Done' : 'Edit';
+  b.hidden = !show; b.textContent = editWatching ? 'Done' : 'Edit'; b.removeAttribute('aria-label');
 }
 function renderWatching(){
   const list = started();
@@ -180,9 +285,21 @@ function renderWatching(){
       }).join('')}</ul></div></div>
       <p class="foot-note">Swipe left on a show, or tap Edit, to remove it. Removing a show clears its watched episodes.</p>`
     : `<div class="empty-state"><b>Nothing here yet</b>Mark an episode as watched and the show will appear here so you can pick up where you left off.</div>`;
+  $('#watching-list').insertAdjacentHTML('beforeend', `
+    <p class="sec">Your progress</p>
+    <div class="group"><ul class="rows plain">
+      <li><button id="bk-export"><span class="txt"><span class="tt"><span class="nm">Back Up Progress</span><span class="sub">Get a code to save or move to another phone</span></span>${CHEV}</span></button></li>
+      <li><button id="bk-import"><span class="txt"><span class="tt"><span class="nm">Restore from a Backup</span><span class="sub">Paste a code from this or another phone</span></span>${CHEV}</span></button></li>
+    </ul></div>
+    <p class="foot-note">Progress is saved on this phone only. Back it up before clearing Safari data or switching phones.</p>`);
+  $('#bk-export').onclick = openBackup;
+  $('#bk-import').onclick = openRestore;
   updateNavAct('watching');
 }
-$('#nav-act').onclick = () => { editWatching = !editWatching; renderWatching(); };
+$('#nav-act').onclick = () => {
+  if (!$('#v-show').hidden) { if (cur) shareShow(cur); return; }
+  editWatching = !editWatching; renderWatching();
+};
 // swipe left on a Watching row to reveal Remove
 let sw = null;
 $('#watching-list').addEventListener('touchstart', e => {
@@ -269,7 +386,7 @@ function renderShow(){
     }
     const c = x && x.ch[e[0]];
     const meta = [badge(e), c ? `<span class="chap">${chText(c)}</span>` : ''].filter(Boolean).join('');
-    rows += `<li class="${done.has(e[0]) ? 'done' : ''}"><input type="checkbox" class="ck" id="w-${esc(e[0])}" data-n="${esc(e[0])}" ${done.has(e[0]) ? 'checked' : ''} aria-label="Watched episode ${esc(e[0])}"><label class="body" for="w-${esc(e[0])}"><span class="n">${esc(e[0])}</span><span class="t">${esc(e[1])}${meta ? `<span class="bdg">${meta}</span>` : ''}</span></label></li>`;
+    rows += `<li data-ep="${esc(e[0])}" class="${done.has(e[0]) ? 'done' : ''}"><input type="checkbox" class="ck" id="w-${esc(e[0])}" data-n="${esc(e[0])}" ${done.has(e[0]) ? 'checked' : ''} aria-label="Watched episode ${esc(e[0])}"><label class="body" for="w-${esc(e[0])}"><span class="n">${esc(e[0])}</span><span class="t">${esc(e[1])}${meta ? `<span class="bdg">${meta}</span>` : ''}</span></label></li>`;
     shown++; last = i;
   }
   const remaining = watch.filter(e => !hideDone || !done.has(e[0])).length - shown;
@@ -339,7 +456,8 @@ function renderShow(){
     <div class="group" style="margin-top:12px">
       ${rows ? `<ol class="eps">${rows}</ol>` : `<div class="empty">${hideDone ? 'You have watched everything in this guide.' : 'No episodes in this guide.'}</div>`}
       ${remaining > 0 ? `<button class="more" id="more">Show ${Math.min(remaining, 300)} more</button>` : ''}
-    </div>`;
+    </div>
+    ${rows ? `<p class="foot-note">Press and hold an episode to mark everything up to it as watched.</p>` : ''}`;
 
   const rerender = () => { const y = scrollY; renderShow(); scrollTo(0, y); };
   el.querySelectorAll('.seg button').forEach(b => b.onclick = () => { guide = b.dataset.g; store.set('guide', guide); limit = 120; rerender(); });
@@ -365,6 +483,39 @@ function renderShow(){
   el.querySelectorAll('ol.eps input').forEach(c => c.onchange = () => setWatched(c.dataset.n, c.checked));
   const nd = $('#next-done');
   if (nd) nd.onclick = () => { setWatched(nd.dataset.n, true); toast(`Episode ${nd.dataset.n} watched`); };
+
+  // press and hold (or right-click) an episode: mark everything up to it, or unmark from it on
+  const epMenu = n => {
+    const idx = watch.findIndex(e => e[0] === n); if (idx < 0) return;
+    const upTo = watch.slice(0, idx + 1).map(e => e[0]);
+    const fromHere = watch.slice(idx).map(e => e[0]).filter(m => done.has(m));
+    const actions = [{label: upTo.length > 1 ? `Mark Episodes ${upTo[0]}–${n} Watched` : `Mark Episode ${n} Watched`, fn: () => {
+      markMany(upTo); rerender(); toast(upTo.length > 1 ? `${upTo.length.toLocaleString()} episodes marked watched` : `Episode ${n} watched`);
+    }}];
+    if (fromHere.length) actions.push({label: fromHere.length > 1 ? `Unmark Episode ${n} and Later` : `Unmark Episode ${n}`, destructive: true, fn: () => {
+      const before = store.get('w:' + s.s, []);
+      const set = doneSet(s); fromHere.forEach(m => set.delete(m)); store.set('w:' + s.s, [...set]); rerender();
+      toast(`${fromHere.length.toLocaleString()} episode${fromHere.length > 1 ? 's' : ''} unmarked`, {label: 'Undo', fn: () => { store.set('w:' + s.s, before); rerender(); }});
+    }});
+    const ep = watch[idx];
+    sheet({title: `Episode ${n}`, message: ep[1], actions});
+  };
+  const list = el.querySelector('ol.eps');
+  if (list) {
+    let lp = null;
+    list.addEventListener('touchstart', e => {
+      const li = e.target.closest('li[data-ep]'); if (!li) return;
+      const t = e.touches[0];
+      lp = {x: t.clientX, y: t.clientY, fired: false, timer: setTimeout(() => { lp.fired = true; li.classList.add('pressed'); epMenu(li.dataset.ep); setTimeout(() => li.classList.remove('pressed'), 300); }, 480)};
+    }, {passive: true});
+    list.addEventListener('touchmove', e => {
+      if (!lp) return; const t = e.touches[0];
+      if (Math.abs(t.clientX - lp.x) > 10 || Math.abs(t.clientY - lp.y) > 10) { clearTimeout(lp.timer); lp = null; }
+    }, {passive: true});
+    list.addEventListener('touchend', e => { if (!lp) return; clearTimeout(lp.timer); if (lp.fired) e.preventDefault(); lp = null; });
+    list.addEventListener('touchcancel', () => { if (lp) clearTimeout(lp.timer); lp = null; });
+    list.addEventListener('contextmenu', e => { const li = e.target.closest('li[data-ep]'); if (li) { e.preventDefault(); epMenu(li.dataset.ep); } });
+  }
 
 
   // arcs: tap to jump to that arc in the episode list

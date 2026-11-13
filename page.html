@@ -168,6 +168,27 @@ li.sw .del{position:absolute;top:0;right:0;bottom:0;width:96px;min-height:0;padd
 li.sw.open > button[data-open]{transform:translateX(-96px)}
 .toast.has-act{pointer-events:auto}
 .toast-act{border:0;background:none;color:#64A8FF;font-size:15px;font-weight:600;margin-left:10px;padding:0;cursor:pointer}
+
+/* action sheet, backup codes, long-press */
+.sheet-bg{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,0);transition:background .22s;display:flex;align-items:flex-end;justify-content:center;padding:0 max(8px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.sheet-bg.show{background:rgba(0,0,0,.35)}
+.sheet{width:100%;max-width:560px;display:flex;flex-direction:column;gap:8px;transform:translateY(110%);transition:transform .25s cubic-bezier(.3,.7,.4,1)}
+.sheet-bg.show .sheet{transform:none}
+.sheet-card{background:var(--card);border-radius:14px;overflow:hidden}
+.sheet-head{padding:14px 18px 12px;text-align:center;border-bottom:.5px solid var(--sep)}
+.sheet-title{margin:0;font-size:13px;font-weight:600;color:var(--label2)}
+.sheet-msg{margin:4px 0 0;font-size:13px;color:var(--label2);line-height:1.4}
+.sheet-btn{display:block;width:100%;border:0;background:var(--card);color:var(--blue);font-size:19px;padding:16px;cursor:pointer;border-top:.5px solid var(--sep)}
+.sheet-card .sheet-btn:first-child{border-top:0}
+.sheet-head + .sheet-btn,.sheet-head + textarea{border-top:0}
+.sheet-btn:active{background:var(--fill)}
+.sheet-btn.destructive{color:#FF3B30}
+.sheet-cancel{border-radius:14px;font-weight:600;border-top:0}
+textarea.code{display:block;width:calc(100% - 32px);margin:12px 16px;height:96px;border:0;border-radius:10px;background:var(--fill);color:var(--label);font:13px ui-monospace,"SF Mono",Menlo,monospace;padding:10px 12px;resize:none;outline:none;word-break:break-all}
+.sheet-err{margin:-4px 16px 12px;font-size:13px;color:#FF3B30}
+.rows.plain button{min-height:60px}
+ol.eps li[data-ep]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:background .15s}
+ol.eps li.pressed{background:var(--fill)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
