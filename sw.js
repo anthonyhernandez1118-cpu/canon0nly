@@ -1,7 +1,7 @@
 // Offline support. The app shell is cached on install; data.json is network-first so new lists arrive
 // as soon as you are online; posters are cached as you see them.
-const SHELL = 'canon-shell-v6', RUNTIME = 'canon-runtime-v6';
-const FILES = ['./', 'index.html', 'app.js', 'data.json', 'manifest.webmanifest', 'icons/icon-192.png'];
+const SHELL = 'canon-shell-v7', RUNTIME = 'canon-runtime-v7';
+const FILES = ['./', 'index.html', 'app.js', 'data.json', 'manifest.webmanifest', 'icons/deezy-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== SHELL && k !== RUNTIME).map(k => caches.delete(k)))).then(() => self.clients.claim()));
