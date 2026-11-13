@@ -25,24 +25,46 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:8px}
 
-/* search bar */
-.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid transparent;transition:border-color .2s}
-.bar.scrolled{border-bottom-color:var(--sep)}
-.bar .col{padding-block:10px}
-.search{position:relative}
-.search input{width:100%;height:38px;border:0;border-radius:10px;background:var(--fill);color:var(--label);font:17px var(--font);padding:0 12px 0 34px;outline:none;-webkit-appearance:none;appearance:none}
-.search input::placeholder{color:var(--label2)}
-.search input::-webkit-search-cancel-button{-webkit-appearance:none}
-.search > svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--label2);pointer-events:none}
-.sugg{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 8px);background:var(--card);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.18);max-height:min(60vh,420px);overflow-y:auto}
-.sugg button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;padding:8px 14px;cursor:pointer}
-.sugg button + button .txt{border-top:.5px solid var(--sep)}
-.sugg img{width:32px;height:48px;border-radius:5px;object-fit:cover;flex:none;background:var(--fill)}
-.sugg .txt{flex:1;min-width:0;padding-block:6px;display:flex;flex-direction:column;gap:1px;align-self:stretch;justify-content:center}
-.sugg .nm{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sugg .sub{font-size:13px;color:var(--label2)}
-.sugg button[aria-selected="true"]{background:var(--fill)}
-.sugg .none{padding:16px;color:var(--label2);font-size:15px}
+/* nav bar + tab bar */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:.5px solid transparent;transition:border-color .2s}
+.nav.scrolled{border-bottom-color:var(--sep)}
+.nav .col{height:44px;display:grid;grid-template-columns:1fr minmax(0,auto) 1fr;align-items:center;gap:8px}
+.back{justify-self:start;display:flex;align-items:center;gap:2px;background:none;border:0;padding:6px 0;color:var(--blue);font-size:17px;cursor:pointer;margin-left:-6px}
+.nav .ttl{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .2s;text-align:center}
+.nav.compact .ttl{opacity:1}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs .in{max-width:680px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+.tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0 6px;background:none;border:0;color:var(--label3);font-size:10px;font-weight:500;cursor:pointer}
+.tabs button[aria-current="page"]{color:var(--blue)}
+.tabs svg{width:26px;height:26px}
+main{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+.view{animation:fade .22s ease-out}
+.view.push{animation:push .3s cubic-bezier(.2,.8,.3,1)}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes push{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+
+/* search field */
+.sfield{position:relative;margin-top:12px}
+.sfield input,.sfield .fake{width:100%;height:38px;border:0;border-radius:10px;background:var(--fill);color:var(--label);font:17px var(--font);padding:0 12px 0 34px;outline:none;-webkit-appearance:none;appearance:none;text-align:left;display:flex;align-items:center;cursor:text}
+.sfield .fake{color:var(--label2)}
+.sfield input::placeholder{color:var(--label2)}
+.sfield input::-webkit-search-cancel-button{-webkit-appearance:none}
+.sfield svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--label2);pointer-events:none}
+
+/* list rows */
+.rows{list-style:none;margin:0;padding:0}
+.rows button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;padding:0 0 0 16px;cursor:pointer;min-height:64px}
+.rows button:active{background:var(--fill)}
+.rows img{width:40px;height:60px;border-radius:6px;object-fit:cover;flex:none;background:var(--fill);margin-block:8px}
+.rows .txt{flex:1;min-width:0;display:flex;align-items:center;gap:8px;align-self:stretch;padding-right:14px}
+.rows li + li .txt{border-top:.5px solid var(--sep)}
+.rows .tt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rows .nm{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rows .sub{font-size:14px;color:var(--label2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rows .chev{color:var(--label3);flex:none}
+.letter{position:sticky;top:calc(44px + env(safe-area-inset-top,0px));z-index:2;background:var(--bg);margin:0;padding:14px 16px 6px;font-size:13px;font-weight:600;color:var(--label2)}
+.empty-state{text-align:center;padding:48px 24px;color:var(--label2);font-size:15px;line-height:1.45}
+.empty-state b{display:block;color:var(--label);font-size:20px;font-weight:600;margin-bottom:6px}
 
 /* titles */
 .lt{padding-block:6px 0}
@@ -58,11 +80,11 @@ button{font:inherit;color:inherit}
 .rail button{flex:none;width:92px;background:none;border:0;padding:0;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:6px;scroll-snap-align:start;font-size:13px;line-height:1.25}
 .rail img{width:92px;height:138px;border-radius:10px;object-fit:cover;background:var(--fill);transition:transform .2s}
 .rail button:active img{transform:scale(.96)}
-.rail button[aria-current="true"] img{box-shadow:0 0 0 2.5px var(--bg),0 0 0 5px var(--blue)}
+.rail small{font-size:12px;color:var(--label2);margin-top:-3px}
 .rail span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* show */
-.show-card{display:flex;gap:16px;align-items:center;margin-top:24px}
+.show-card{display:flex;gap:16px;align-items:center;margin-top:8px}
 .show-card img{width:84px;height:126px;border-radius:10px;object-fit:cover;flex:none;background:var(--fill);box-shadow:0 4px 14px rgba(0,0,0,.15)}
 .show-card .info{min-width:0;display:flex;flex-direction:column;gap:4px}
 .show-card h2{margin:0;font-family:var(--display);font-size:24px;font-weight:700;line-height:1.15;text-wrap:balance;overflow-wrap:anywhere}
@@ -115,33 +137,58 @@ ol.eps li.gap .body{justify-content:center;padding:7px 16px 7px 0;font-size:13px
 .empty,.loading{color:var(--label2);text-align:center;padding:40px 16px;font-size:15px}
 footer{padding-block:32px 48px;font-size:13px;color:var(--label2);line-height:1.5;display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center}
 footer a{color:var(--blue);text-decoration:none}
-.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:rgba(30,30,30,.92);color:#fff;font-size:15px;padding:10px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30}
+.toast{position:fixed;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:rgba(30,30,30,.92);color:#fff;font-size:15px;padding:10px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
-<div class="bar" id="bar">
+<div class="nav" id="nav">
   <div class="col">
-    <div class="search" role="combobox" aria-haspopup="listbox" aria-owns="sugg">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.5-4.5"/></svg>
-      <input id="q" type="search" autocomplete="off" placeholder="Search anime" aria-label="Search anime" aria-autocomplete="list" aria-controls="sugg">
-      <div class="sugg" id="sugg" role="listbox" hidden></div>
-    </div>
+    <span><button class="back" id="back" hidden aria-label="Back"><svg width="13" height="21" viewBox="0 0 13 21" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2 2.5 10.5l8 8.5"/></svg>Back</button></span>
+    <span class="ttl" id="ttl"></span>
+    <span></span>
   </div>
 </div>
-<div class="col">
-  <div class="lt">
-    <h1>Canon Only</h1>
-    <p>Just the episodes that matter.</p>
+
+<main class="col">
+  <section class="view" id="v-home">
+    <div class="lt"><h1>Canon Only</h1><p>Just the episodes that matter.</p></div>
+    <div class="sfield"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.5-4.5"/></svg><button class="fake" id="home-search">Search anime</button></div>
+    <div id="continue"></div>
+    <p class="sec">Popular</p>
+    <div class="rail" id="quick"></div>
+    <footer>
+      <span>Episode data from the community-run <a href="https://www.animefillerlist.com" target="_blank" rel="noopener">Anime Filler List</a>. <span id="updated"></span><br>Your progress is saved on this device.</span>
+      <span id="refresh-area"></span>
+    </footer>
+  </section>
+
+  <section class="view" id="v-watching" hidden>
+    <div class="lt"><h1>Watching</h1></div>
+    <div id="watching-list"></div>
+  </section>
+
+  <section class="view" id="v-search" hidden>
+    <div class="lt"><h1>Search</h1></div>
+    <div class="sfield"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.5-4.5"/></svg><input id="q" type="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Search anime" aria-label="Search anime"></div>
+    <div id="results"></div>
+  </section>
+
+  <section class="view push" id="v-show" hidden>
+    <div id="show"></div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Tabs">
+  <div class="in">
+    <button data-tab="home" aria-current="page">
+      <svg viewBox="0 0 28 28" fill="currentColor"><path d="M14 3.2 2.6 13a1 1 0 0 0 1.3 1.5L5 13.6V23a2 2 0 0 0 2 2h4.5v-6.5h5V25H21a2 2 0 0 0 2-2v-9.4l1.1.9a1 1 0 0 0 1.3-1.5Z"/></svg>Home</button>
+    <button data-tab="watching">
+      <svg viewBox="0 0 28 28" fill="currentColor"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3h13A2.5 2.5 0 0 1 23 5.5v12a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 5 17.5Zm7 3.1v6.8a.6.6 0 0 0 .9.5l5.4-3.4a.6.6 0 0 0 0-1l-5.4-3.4a.6.6 0 0 0-.9.5ZM8 23h12a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2Z"/></svg>Watching</button>
+    <button data-tab="search">
+      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12.5" cy="12.5" r="7.5"/><path d="m23.5 23.5-5.6-5.6"/></svg>Search</button>
   </div>
-  <p class="sec">Popular</p>
-  <div class="rail" id="quick"></div>
-  <section id="show"><p class="loading">Loading…</p></section>
-  <footer>
-    <span>Episode data from the community-run <a href="https://www.animefillerlist.com" target="_blank" rel="noopener">Anime Filler List</a>. <span id="updated"></span><br>Your progress is saved on this device.</span>
-    <span id="refresh-area"></span>
-  </footer>
-</div>
+</nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>
 </body></html>
