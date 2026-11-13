@@ -168,24 +168,95 @@ q.addEventListener('input', () => { delete $('#results').dataset.az; renderResul
 q.addEventListener('keydown', e => { if (e.key === 'Enter') { const b = $('#results [data-open]'); if (b && q.value.trim()) { q.blur(); b.click(); } } });
 
 /* ---------- show detail ---------- */
+// Extra data (story arcs, manga chapters) for shows that have it, loaded on demand.
+const EXTRA = {}; let EXTRA_INDEX = [];
+async function loadExtra(s){
+  if (!EXTRA_INDEX.includes(s.s) || EXTRA[s.s] !== undefined) return;
+  EXTRA[s.s] = null;
+  try { const r = await fetch(`extras/${s.s}.json`); if (r.ok) EXTRA[s.s] = await r.json(); } catch {}
+  if (cur === s && !$('#v-show').hidden) { const y = scrollY; renderShow(); scrollTo(0, y); }
+}
+let pace = store.get('pace', 3);
+const chText = c => c ? (c[0] === c[1] ? `Ch. ${c[0]}` : `Ch. ${c[0]}${c[0] < 0 || c[1] < 0 ? ' to ' : '–'}${c[1]}`) : '';
+function arcChapters(x, a){
+  let lo = Infinity, hi = -Infinity;
+  for (let n = a.start; n <= a.end; n++) { const c = x.ch[n]; if (c) { lo = Math.min(lo, c[0]); hi = Math.max(hi, c[1]); } }
+  return lo === Infinity ? null : [lo, hi];
+}
+function fmtDuration(min){
+  const h = Math.round(min / 60);
+  return h < 1 ? `${min} minutes` : h === 1 ? 'about 1 hour' : `about ${h.toLocaleString()} hours`;
+}
+
 function renderShow(){
   const s = cur, el = $('#show');
   if (!s) return;
+  loadExtra(s);
+  const x = EXTRA[s.s] || null;
   const eps = s.e, watch = eps.filter(e => keep(s, e));
   const done = doneSet(s);
   const next = watch.find(e => !done.has(e[0]));
   const gi = Object.keys(GUIDES).indexOf(guide);
+  const arcOf = n => x ? x.arcs.find(a => n >= a.start && n <= a.end) : null;
 
-  let rows = '', shown = 0, last = -1;
+  // episode list, with arc headings and named filler gaps
+  let rows = '', shown = 0, last = -1, lastArc = null;
   for (let i = 0; i < eps.length && shown < limit; i++) {
     const e = eps[i]; if (!keep(s, e)) continue;
     if (hideDone && done.has(e[0])) { last = i; continue; }
-    const gap = eps.slice(last + 1, i).filter(x => !keep(s, x)).length;
-    if (gap) rows += `<li class="gap"><span class="body">${gap} filler episode${gap > 1 ? 's' : ''} skipped</span></li>`;
-    rows += `<li class="${done.has(e[0]) ? 'done' : ''}"><input type="checkbox" class="ck" id="w-${esc(e[0])}" data-n="${esc(e[0])}" ${done.has(e[0]) ? 'checked' : ''} aria-label="Watched episode ${esc(e[0])}"><label class="body" for="w-${esc(e[0])}"><span class="n">${esc(e[0])}</span><span class="t">${esc(e[1])}${badge(e) ? `<span class="bdg">${badge(e)}</span>` : ''}</span></label></li>`;
+    const skipped = eps.slice(last + 1, i).filter(z => !keep(s, z));
+    if (skipped.length) {
+      const names = x ? [...new Set(skipped.map(z => arcOf(+z[0])).filter(a => a && a.filler).map(a => a.name))] : [];
+      const lbl = names.length === 1 ? `${names[0]} arc skipped · ${skipped.length} episode${skipped.length > 1 ? 's' : ''}` : `${skipped.length} filler episode${skipped.length > 1 ? 's' : ''} skipped`;
+      rows += `<li class="gap"><span class="body">${esc(lbl)}</span></li>`;
+    }
+    const a = arcOf(+e[0]);
+    if (a && a !== lastArc && !a.filler) {
+      rows += `<li class="arc" id="arc-${a.start}"><span class="body">${esc(a.name)}</span></li>`;
+      lastArc = a;
+    }
+    const c = x && x.ch[e[0]];
+    const meta = [badge(e), c ? `<span class="chap">${chText(c)}</span>` : ''].filter(Boolean).join('');
+    rows += `<li class="${done.has(e[0]) ? 'done' : ''}"><input type="checkbox" class="ck" id="w-${esc(e[0])}" data-n="${esc(e[0])}" ${done.has(e[0]) ? 'checked' : ''} aria-label="Watched episode ${esc(e[0])}"><label class="body" for="w-${esc(e[0])}"><span class="n">${esc(e[0])}</span><span class="t">${esc(e[1])}${meta ? `<span class="bdg">${meta}</span>` : ''}</span></label></li>`;
     shown++; last = i;
   }
   const remaining = watch.filter(e => !hideDone || !done.has(e[0])).length - shown;
+
+  // time to finish
+  const left = watch.filter(e => !done.has(e[0])).length;
+  const days = Math.ceil(left / pace);
+  const finish = new Date(Date.now() + days * 864e5).toLocaleDateString(undefined, {month: 'long', day: 'numeric', year: days > 300 ? 'numeric' : undefined});
+  const paceHtml = left ? `
+    <p class="sec">Your pace</p>
+    <div class="group">
+      <div class="toggle-row"><span>Episodes a day</span>
+        <span class="stepper"><button id="pace-dn" aria-label="Fewer episodes a day">−</button><b id="pace-v">${pace}</b><button id="pace-up" aria-label="More episodes a day">+</button></span>
+      </div>
+    </div>
+    <p class="foot-note">${left === 1 ? 'One episode left' : `${left.toLocaleString()} episodes left`}, ${fmtDuration(left * 23)} of watching. At ${pace} a day you’ll finish ${days <= 1 ? 'today' : `in ${days.toLocaleString()} days, around ${finish}`}.</p>` : '';
+
+  // manga reader jump-in
+  const hasCh = x && Object.keys(x.ch).length;
+  const mangaHtml = hasCh ? `
+    <p class="sec">Read the manga?</p>
+    <div class="group">
+      <form class="toggle-row" id="manga-form"><label for="manga-ch">I’ve read up to chapter</label><input id="manga-ch" type="number" inputmode="numeric" min="1" placeholder="0" class="numin"></form>
+      <div id="manga-out"></div>
+    </div>` : '';
+
+  // arcs list
+  const arcList = x ? x.arcs.filter(a => !a.filler) : [];
+  const showAllArcs = store.get('allArcs', false);
+  const arcsHtml = arcList.length ? `
+    <p class="sec">Story arcs</p>
+    <div class="group"><ul class="rows arcs">${(showAllArcs ? arcList : arcList.slice(0, 6)).map(a => {
+      const kept = eps.filter(e => +e[0] >= a.start && +e[0] <= a.end && keep(s, e));
+      const fin = kept.length && kept.every(e => done.has(e[0]));
+      const c = arcChapters(x, a);
+      return `<li><button data-arc="${a.start}"><span class="txt"><span class="tt"><span class="nm">${esc(a.name)}</span><span class="sub">Episodes ${a.start === a.end ? a.start : a.start + '–' + a.end}${c ? ' · ' + chText(c).replace('Ch.', c[0] === c[1] ? 'Chapter' : 'Chapters') : ''}</span></span>${fin ? '<span class="tick" aria-label="Watched">✓</span>' : ''}${CHEV}</span></button></li>`;
+    }).join('')}</ul>
+    ${arcList.length > 6 ? `<button class="more" id="arcs-more">${showAllArcs ? 'Show fewer' : `Show all ${arcList.length} arcs`}</button>` : ''}</div>
+    <p class="foot-note">Filler arcs are skipped and not listed. Arc and chapter info from ${esc(x.source.replace(/, CC BY-SA$/, ''))}, shared under CC BY-SA.</p>` : '';
 
   el.innerHTML = `
     <div class="show-card">
@@ -206,9 +277,9 @@ function renderShow(){
     ${next ? `
     <p class="sec">Up next</p>
     <div class="group next">
-      <span class="eyebrow">Episode ${esc(next[0])}</span>
+      <span class="eyebrow">Episode ${esc(next[0])}${arcOf(+next[0]) ? ' · ' + esc(arcOf(+next[0]).name.replace(' (continued)', '')) : ''}</span>
       <h3>${esc(next[1])}</h3>
-      ${badge(next) ? `<div class="badges">${badge(next)}</div>` : ''}
+      ${badge(next) || (x && x.ch[next[0]]) ? `<div class="badges">${badge(next)}${x && x.ch[next[0]] ? `<span class="chap">${chText(x.ch[next[0]])}</span>` : ''}</div>` : ''}
       ${next[2] === 'X' ? `<p class="foot-note" style="padding:0;margin-top:8px">Part canon, part filler. Watch the whole episode.</p>` : ''}
       <div class="acts">
         <button class="btn" id="next-done" data-n="${esc(next[0])}">Mark Watched</button>
@@ -217,6 +288,10 @@ function renderShow(){
     </div>` : watch.length ? `
     <p class="sec">Up next</p>
     <div class="group next"><h3>All caught up</h3><p class="foot-note" style="padding:0">You have watched every episode in this guide.</p></div>` : ''}
+
+    ${paceHtml}
+    ${mangaHtml}
+    ${arcsHtml}
 
     <p class="sec">Episodes <button class="link" id="copy">Copy list</button></p>
     <div class="group">
@@ -236,6 +311,11 @@ function renderShow(){
   };
   $('#hide').onchange = e => { hideDone = e.target.checked; store.set('hideDone', hideDone); rerender(); };
   const more = $('#more'); if (more) more.onclick = () => { limit += 300; rerender(); };
+  const markMany = list => {
+    const set = doneSet(s); list.forEach(n => set.add(n));
+    store.set('w:' + s.s, [...set]);
+    const act = store.get('activity', {}); act[s.s] = Date.now(); store.set('activity', act);
+  };
   const setWatched = (n, on) => {
     const set = doneSet(s);
     on ? set.add(n) : set.delete(n);
@@ -246,6 +326,39 @@ function renderShow(){
   el.querySelectorAll('ol.eps input').forEach(c => c.onchange = () => setWatched(c.dataset.n, c.checked));
   const nd = $('#next-done');
   if (nd) nd.onclick = () => { setWatched(nd.dataset.n, true); toast(`Episode ${nd.dataset.n} watched`); };
+
+  // pace stepper
+  const setPace = v => { pace = Math.min(20, Math.max(1, v)); store.set('pace', pace); rerender(); };
+  const pu = $('#pace-up'), pd = $('#pace-dn');
+  if (pu) { pu.onclick = () => setPace(pace + 1); pd.onclick = () => setPace(pace - 1); }
+
+  // arcs: tap to jump to that arc in the episode list
+  el.querySelectorAll('[data-arc]').forEach(b => b.onclick = () => {
+    const start = +b.dataset.arc;
+    const idx = watch.findIndex(e => +e[0] >= start);
+    if (idx >= limit) { limit = idx + 60; renderShow(); }
+    const target = document.getElementById('arc-' + start) || document.getElementById('w-' + (watch[idx] || [])[0]);
+    if (target) scrollTo({top: target.getBoundingClientRect().top + scrollY - 110, behavior: 'smooth'});
+  });
+  const am = $('#arcs-more'); if (am) am.onclick = () => { store.set('allArcs', !store.get('allArcs', false)); rerender(); };
+
+  // manga jump-in
+  const mf = $('#manga-form');
+  if (mf) mf.onsubmit = ev => {
+    ev.preventDefault();
+    const read = parseInt($('#manga-ch').value, 10), out = $('#manga-out');
+    if (!read || read < 1) { out.innerHTML = `<p class="manga-res">Enter the last chapter you read.</p>`; return; }
+    const start = watch.find(e => x.ch[e[0]] && x.ch[e[0]][1] > read);
+    if (!start) { out.innerHTML = `<p class="manga-res">You’re ahead of the anime. Every canon episode so far covers chapters you’ve read.</p>`; return; }
+    const before = watch.filter(e => +e[0] < +start[0]).map(e => e[0]);
+    out.innerHTML = `<p class="manga-res">Start at <b>Episode ${esc(start[0])}</b>, which picks up at ${chText(x.ch[start[0]])}.</p>
+      ${before.length ? `<div class="acts" style="padding:0 16px 14px;margin:0"><button class="btn tint" id="manga-mark">Mark ${before.length.toLocaleString()} earlier episodes watched</button></div>` : ''}`;
+    const mm = $('#manga-mark');
+    if (mm) mm.onclick = () => {
+      if (!mm.dataset.sure) { mm.dataset.sure = '1'; mm.textContent = 'Tap again to confirm'; return; }
+      markMany(before); toast(`${before.length.toLocaleString()} episodes marked watched`); rerender();
+    };
+  };
 }
 
 /* ---------- boot ---------- */
@@ -266,7 +379,8 @@ async function load(fresh){
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
-load(false).then(boot).catch(() => { $('#continue').innerHTML = '<p class="empty-state">Couldn’t load the episode lists. Check your connection and try again.</p>'; });
+const extrasReady = fetch('extras/index.json').then(r => r.ok ? r.json() : []).then(l => { EXTRA_INDEX = l; }).catch(() => {});
+Promise.all([load(false), extrasReady]).then(([d]) => boot(d)).catch(() => { $('#continue').innerHTML = '<p class="empty-state">Couldn’t load the episode lists. Check your connection and try again.</p>'; });
 
 // Installed app only (not inside Claude): offline support and a manual refresh.
 if (!window.claude && document.querySelector('link[rel="manifest"]')) {
