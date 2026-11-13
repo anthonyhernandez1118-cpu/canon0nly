@@ -11,31 +11,13 @@ const store = {
 };
 const TYPE = {M:'Manga canon', A:'Anime canon', X:'Mixed', F:'Filler'};
 
-// Filler arcs fans widely recommend. Episode ranges are inclusive. Add more shows here.
-const FAVS = {
-  'one-piece':         [[196, 206, 'G-8 arc']],
-  'naruto-shippuden':  [[349, 361, 'Kakashi ANBU arc']],
-  'bleach':            [[230, 265, 'Zanpakutō Rebellion arc']],
-  'dragon-ball-z':     [[125, 125, 'Goku’s driving test']],
-};
-const favOf = (s, e) => {
-  const n = parseInt(e[0], 10);
-  return e[2] === 'F' && (FAVS[s.s] || []).find(([a, b]) => n >= a && n <= b) || null;
-};
-
 const GUIDES = {
-  purist:   {label:'Manga Purist', note:'Only episodes adapted straight from the manga. Mixed and anime-original episodes are cut too.'},
-  core:     {label:'Core Story',   note:'The full main story: manga canon, mixed episodes and anime-original canon. Filler is cut.'},
-  complete: {label:'Complete',     note:'The core story plus the filler arcs fans say are worth your time.'},
+  core:   {label:'Core Story',   note:'The full main story, with every filler episode cut.'},
+  purist: {label:'Manga Purist', note:'Only episodes adapted straight from the manga.'},
 };
 let guide = store.get('guide', 'core');
 if (!GUIDES[guide]) guide = 'core';
-const keep = (s, e) => {
-  if (e[2] === 'M') return true;
-  if (guide === 'purist') return false;
-  if (e[2] === 'A' || e[2] === 'X') return true;
-  return guide === 'complete' && !!favOf(s, e);
-};
+const keep = (s, e) => e[2] === 'M' || (guide === 'core' && (e[2] === 'A' || e[2] === 'X'));
 
 let cur = null, limit = 120, hideDone = store.get('hideDone', false);
 
@@ -108,8 +90,6 @@ const services = s => {
   ];
 };
 const badge = (s, e) => {
-  const f = favOf(s, e);
-  if (f) return `<span class="badge fav" title="${esc(f[2])}">★ Fan favorite</span>`;
   if (e[2] === 'X') return `<span class="badge X">Mixed</span>`;
   if (e[2] === 'A') return `<span class="badge A">Anime canon</span>`;
   return '';
@@ -122,13 +102,9 @@ function render(){
   document.querySelectorAll('#quick button').forEach(b => b.setAttribute('aria-current', b.dataset.s === s.s));
   const eps = s.e, watch = eps.filter(e => keep(s, e));
   const done = new Set(store.get('w:' + s.s, []));
-  const watched = watch.filter(e => done.has(e[0])).length;
-  const skip = eps.length - watch.length, hrs = Math.round(skip * 23 / 60);
+  const skip = eps.length - watch.length;
   const next = watch.find(e => !done.has(e[0]));
-  const favs = FAVS[s.s] || [];
   const gi = Object.keys(GUIDES).indexOf(guide);
-  const pct = watch.length ? Math.floor(watched / watch.length * 100) : 0;
-  const hasA = eps.some(e => e[2]==='A'), hasX = eps.some(e => e[2]==='X');
 
   let rows = '', shown = 0, last = -1;
   for (let i = 0; i < eps.length && shown < limit; i++) {
@@ -141,9 +117,7 @@ function render(){
   }
   const remaining = watch.filter(e => !hideDone || !done.has(e[0])).length - shown;
 
-  let guideNote = GUIDES[guide].note;
-  if (guide === 'complete' && !favs.length) guideNote = 'No fan-favorite filler is picked for this show yet, so this matches Core Story.';
-  if (guide === 'complete' && favs.length) guideNote += ' Included: ' + favs.map(f => `${f[2]} (${f[0] === f[1] ? 'ep ' + f[0] : 'eps ' + f[0] + '–' + f[1]})`).join(', ') + '.';
+  const guideNote = `${watch.length} of ${eps.length} episodes. ${GUIDES[guide].note}`;
 
   el.innerHTML = `
     <div class="show-card">
@@ -175,29 +149,6 @@ function render(){
     </div>` : watch.length ? `
     <p class="sec">Up next</p>
     <div class="group next"><h3>All caught up</h3><p class="foot-note" style="padding:0">You have watched every episode in this guide.</p></div>` : ''}
-
-    <p class="sec">Your plan</p>
-    <div class="group">
-      <div class="stats">
-        <div class="stat"><b>${watch.length}</b><span>to watch</span></div>
-        <div class="stat"><b>${skip}</b><span>skipped</span></div>
-        <div class="stat"><b>${hrs}h</b><span>saved</span></div>
-      </div>
-      <div class="progress">
-        <div class="track"><i style="width:${watch.length ? Math.max(watched ? 1 : 0, watched / watch.length * 100) : 0}%"></i></div>
-        <small>${watched} of ${watch.length} watched${pct >= 1 ? ` · ${pct}%` : ''}</small>
-      </div>
-    </div>
-    <div style="margin-top:14px">
-      <div class="bar-strip" style="gap:${eps.length > 200 ? 0 : 1}px" aria-label="Every episode in order">${eps.map(e => `<i class="${e[2]}${keep(s, e) ? ' on' : ''}${favOf(s, e) ? ' fav' : ''}${done.has(e[0]) ? ' w' : ''}"></i>`).join('')}</div>
-      <div class="legend">
-        <span><i style="background:var(--blue)"></i>Canon</span>
-        ${hasX && guide !== 'purist' ? `<span><i style="background:var(--orange)"></i>Mixed</span>` : ''}
-        ${hasA && guide !== 'purist' ? `<span><i style="background:var(--teal)"></i>Anime canon</span>` : ''}
-        ${favs.length && guide === 'complete' ? `<span><i style="background:var(--yellow)"></i>Fan favorite</span>` : ''}
-        <span><i style="background:var(--filler)"></i>Skipped</span>
-      </div>
-    </div>
 
     <p class="sec">Episodes <button class="link" id="copy">Copy list</button></p>
     <div class="group">
