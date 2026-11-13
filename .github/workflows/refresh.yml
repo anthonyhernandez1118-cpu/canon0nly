@@ -1,0 +1,26 @@
+name: Refresh episode lists
+on:
+  schedule:
+    - cron: "17 4 * * 1"   # every Monday, 04:17 UTC
+  workflow_dispatch: {}     # "Run workflow" button in the Actions tab
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pillow
+      - name: Pull the latest lists and any new posters
+        run: |
+          python3 -I scripts/scrape.py .cache/raw data.json .cache/posters.txt
+          python3 -I scripts/posters.py .cache/posters.txt .cache/dl posters
+      - name: Commit if anything changed
+        run: |
+          git config user.name "canon-only-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json posters
+          git diff --cached --quiet || git commit -m "Refresh episode lists"
+          git push
