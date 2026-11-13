@@ -233,16 +233,11 @@ async function loadExtra(s){
   try { const r = await fetch(`extras/${s.s}.json`); if (r.ok) EXTRA[s.s] = await r.json(); } catch {}
   if (cur === s && !$('#v-show').hidden) { const y = scrollY; renderShow(); scrollTo(0, y); }
 }
-let pace = store.get('pace', 3);
 const chText = c => c ? (c[0] === c[1] ? `Ch. ${c[0]}` : `Ch. ${c[0]}${c[0] < 0 || c[1] < 0 ? ' to ' : '–'}${c[1]}`) : '';
 function arcChapters(x, a){
   let lo = Infinity, hi = -Infinity;
   for (let n = a.start; n <= a.end; n++) { const c = x.ch[n]; if (c) { lo = Math.min(lo, c[0]); hi = Math.max(hi, c[1]); } }
   return lo === Infinity ? null : [lo, hi];
-}
-function fmtDuration(min){
-  const h = Math.round(min / 60);
-  return h < 1 ? `${min} minutes` : h === 1 ? 'about 1 hour' : `about ${h.toLocaleString()} hours`;
 }
 
 function renderShow(){
@@ -279,18 +274,6 @@ function renderShow(){
   }
   const remaining = watch.filter(e => !hideDone || !done.has(e[0])).length - shown;
 
-  // time to finish
-  const left = watch.filter(e => !done.has(e[0])).length;
-  const days = Math.ceil(left / pace);
-  const finish = new Date(Date.now() + days * 864e5).toLocaleDateString(undefined, {month: 'long', day: 'numeric', year: days > 300 ? 'numeric' : undefined});
-  const paceHtml = left ? `
-    <p class="sec">Your pace</p>
-    <div class="group">
-      <div class="toggle-row"><span>Episodes a day</span>
-        <span class="stepper"><button id="pace-dn" aria-label="Fewer episodes a day">−</button><b id="pace-v">${pace}</b><button id="pace-up" aria-label="More episodes a day">+</button></span>
-      </div>
-    </div>
-    <p class="foot-note">${left === 1 ? 'One episode left' : `${left.toLocaleString()} episodes left`}, ${fmtDuration(left * 23)} of watching. At ${pace} a day you’ll finish ${days <= 1 ? 'today' : `in ${days.toLocaleString()} days, around ${finish}`}.</p>` : '';
 
   // manga reader jump-in
   const hasCh = x && Object.keys(x.ch).length;
@@ -346,7 +329,6 @@ function renderShow(){
     <p class="sec">Up next</p>
     <div class="group next"><h3>All caught up</h3><p class="foot-note" style="padding:0">You have watched every episode in this guide.</p></div>` : ''}
 
-    ${paceHtml}
     ${mangaHtml}
     ${arcsHtml}
 
@@ -384,10 +366,6 @@ function renderShow(){
   const nd = $('#next-done');
   if (nd) nd.onclick = () => { setWatched(nd.dataset.n, true); toast(`Episode ${nd.dataset.n} watched`); };
 
-  // pace stepper
-  const setPace = v => { pace = Math.min(20, Math.max(1, v)); store.set('pace', pace); rerender(); };
-  const pu = $('#pace-up'), pd = $('#pace-dn');
-  if (pu) { pu.onclick = () => setPace(pace + 1); pd.onclick = () => setPace(pace - 1); }
 
   // arcs: tap to jump to that arc in the episode list
   el.querySelectorAll('[data-arc]').forEach(b => b.onclick = () => {
