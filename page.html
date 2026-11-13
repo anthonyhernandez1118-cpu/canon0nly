@@ -156,6 +156,20 @@ ol.eps li.arc + li .body{border-top:0}
 .numin::-webkit-outer-spin-button,.numin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .manga-res{margin:0;padding:0 16px 14px;font-size:15px;color:var(--label2);line-height:1.4}
 .manga-res b{color:var(--label)}
+
+/* remove: Continue Watching edit mode and Watching swipe */
+.nav-act{background:none;border:0;color:var(--blue);font-size:17px;padding:6px 0;cursor:pointer}
+.rail button{position:relative}
+.rail .x{position:absolute;top:-6px;left:-6px;width:26px;height:26px;border-radius:50%;background:var(--label2);color:var(--card);display:grid;place-content:center;font-size:18px;line-height:1;font-weight:600;box-shadow:0 0 0 2px var(--bg);cursor:pointer}
+.rail.editing img{animation:jiggle .28s ease-in-out infinite alternate}
+.rail.editing button:nth-child(2n) img{animation-delay:-.14s}
+@keyframes jiggle{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
+li.sw{position:relative;overflow:hidden}
+li.sw > button[data-open]{position:relative;z-index:1;background:var(--card);transition:transform .22s cubic-bezier(.3,.7,.4,1)}
+li.sw .del{position:absolute;top:0;right:0;bottom:0;width:96px;min-height:0;padding:0;justify-content:center;border:0;background:#FF3B30;color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+li.sw.open > button[data-open]{transform:translateX(-96px)}
+.toast.has-act{pointer-events:auto}
+.toast-act{border:0;background:none;color:#64A8FF;font-size:15px;font-weight:600;margin-left:10px;padding:0;cursor:pointer}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -163,7 +177,7 @@ ol.eps li.arc + li .body{border-top:0}
   <div class="col">
     <span><button class="back" id="back" hidden aria-label="Back"><svg width="13" height="21" viewBox="0 0 13 21" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2 2.5 10.5l8 8.5"/></svg>Back</button></span>
     <span class="ttl" id="ttl"></span>
-    <span></span>
+    <span style="justify-self:end"><button class="nav-act" id="nav-act" hidden>Edit</button></span>
   </div>
 </div>
 

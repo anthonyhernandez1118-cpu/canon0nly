@@ -54,9 +54,27 @@ const services = s => {
 };
 const badge = e => e[2] === 'X' ? `<span class="badge X">Mixed</span>` : e[2] === 'A' ? `<span class="badge A">Anime canon</span>` : '';
 let toastT;
-function toast(msg){
-  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1800);
+function toast(msg, action){
+  const t = $('#toast');
+  t.innerHTML = esc(msg) + (action ? ` <button class="toast-act">${esc(action.label)}</button>` : '');
+  t.classList.toggle('has-act', !!action); t.classList.add('show');
+  if (action) t.querySelector('.toast-act').onclick = () => { t.classList.remove('show'); action.fn(); };
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), action ? 5000 : 1800);
+}
+// Remove a show from Continue Watching / Watching by clearing its progress, with Undo.
+function removeShow(s){
+  const saved = store.get('w:' + s.s, []), act = store.get('activity', {}), when = act[s.s];
+  store.set('w:' + s.s, []); delete act[s.s]; store.set('activity', act);
+  refreshLists();
+  toast(`Removed ${s.n}`, {label: 'Undo', fn: () => {
+    store.set('w:' + s.s, saved);
+    const a = store.get('activity', {}); if (when) a[s.s] = when; store.set('activity', a);
+    refreshLists();
+  }});
+}
+function refreshLists(){
+  if (!$('#v-home').hidden) renderHome();
+  if (!$('#v-watching').hidden) renderWatching();
 }
 function ranges(s){
   const out = []; let a = null, b = null;
@@ -81,6 +99,7 @@ function setView(name){
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== 'v-' + name);
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === tab ? 'page' : 'false'));
   $('#back').hidden = name !== 'show';
+  updateNavAct(name);
   $('#ttl').textContent = name === 'show' ? (cur ? cur.n : '') : ({home:'Canon Only', watching:'Watching', search:'Search'})[name];
   onScroll();
 }
@@ -115,6 +134,10 @@ addEventListener('hashchange', route);
 $('#back').onclick = () => { if (depth > 0) { depth--; history.back(); } else goTab(tab); };
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => goTab(b.dataset.tab));
 document.addEventListener('click', e => {
+  const r = e.target.closest('[data-remove]');
+  if (r) { e.preventDefault(); e.stopPropagation(); removeShow(DATA[+r.dataset.remove]); return; }
+  const open = e.target.closest('li.sw.open');
+  if (open && !editWatching) { open.classList.remove('open'); return; }
   const b = e.target.closest('[data-open]');
   if (b) openShow(DATA[+b.dataset.open]);
 });
@@ -126,22 +149,56 @@ function onScroll(){
 addEventListener('scroll', onScroll, {passive:true});
 
 /* ---------- home ---------- */
+let editCont = false;
 function renderHome(){
   const cont = started().slice(0, 12);
-  $('#continue').innerHTML = cont.length ? `<p class="sec">Continue Watching</p><div class="rail">${cont.map(s => {
+  if (!cont.length) editCont = false;
+  $('#continue').innerHTML = cont.length ? `<p class="sec">Continue Watching <button class="link" id="cw-edit">${editCont ? 'Done' : 'Edit'}</button></p><div class="rail${editCont ? ' editing' : ''}">${cont.map(s => {
     const n = nextOf(s);
-    return `<button data-open="${s.i}">${img(s)}<span>${esc(s.n)}</span><small>${n ? 'Episode ' + esc(n[0]) : 'Caught up'}</small></button>`;
+    return `<button data-open="${s.i}">${img(s)}${editCont ? `<span class="x" data-remove="${s.i}" role="button" aria-label="Remove ${esc(s.n)}">×</span>` : ''}<span>${esc(s.n)}</span><small>${n ? 'Episode ' + esc(n[0]) : 'Caught up'}</small></button>`;
   }).join('')}</div>` : '';
+  const ce = $('#cw-edit'); if (ce) ce.onclick = () => { editCont = !editCont; renderHome(); };
 }
 $('#home-search').onclick = () => { goTab('search'); setTimeout(() => $('#q').focus(), 50); };
 
 /* ---------- watching ---------- */
+let editWatching = false;
+function updateNavAct(name){
+  const b = $('#nav-act');
+  const show = name === 'watching' && started().length > 0;
+  if (!show) editWatching = false;
+  b.hidden = !show; b.textContent = editWatching ? 'Done' : 'Edit';
+}
 function renderWatching(){
   const list = started();
+  if (!list.length) editWatching = false;
   $('#watching-list').innerHTML = list.length
-    ? `<div style="margin-top:16px">${rowList(list, s => { const d = doneSet(s); const w = s.e.filter(e => keep(s, e)); return `${nextLabel(s)} · ${w.filter(e => d.has(e[0])).length} of ${w.length} watched`; })}</div>`
+    ? `<div style="margin-top:16px"><div class="group"><ul class="rows watching${editWatching ? ' editing' : ''}">${list.map(s => {
+        const d = doneSet(s), w = s.e.filter(e => keep(s, e));
+        const sub = `${nextLabel(s)} · ${w.filter(e => d.has(e[0])).length} of ${w.length} watched`;
+        return `<li class="sw${editWatching ? ' open' : ''}"><button data-open="${s.i}">${img(s)}<span class="txt"><span class="tt"><span class="nm">${esc(s.n)}</span><span class="sub">${esc(sub)}</span></span>${CHEV}</span></button><button class="del" data-remove="${s.i}" aria-label="Remove ${esc(s.n)}">Remove</button></li>`;
+      }).join('')}</ul></div></div>
+      <p class="foot-note">Swipe left on a show, or tap Edit, to remove it. Removing a show clears its watched episodes.</p>`
     : `<div class="empty-state"><b>Nothing here yet</b>Mark an episode as watched and the show will appear here so you can pick up where you left off.</div>`;
+  updateNavAct('watching');
 }
+$('#nav-act').onclick = () => { editWatching = !editWatching; renderWatching(); };
+// swipe left on a Watching row to reveal Remove
+let sw = null;
+$('#watching-list').addEventListener('touchstart', e => {
+  const li = e.target.closest('li.sw'); if (!li || editWatching) return;
+  sw = {li, x: e.touches[0].clientX, y: e.touches[0].clientY, dir: 0};
+}, {passive: true});
+$('#watching-list').addEventListener('touchmove', e => {
+  if (!sw) return;
+  const dx = e.touches[0].clientX - sw.x, dy = e.touches[0].clientY - sw.y;
+  if (!sw.dir) { if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) sw.dir = 1; else if (Math.abs(dy) > 10) { sw = null; return; } }
+  if (sw.dir) {
+    if (dx < -30) { document.querySelectorAll('li.sw.open').forEach(o => o !== sw.li && o.classList.remove('open')); sw.li.classList.add('open'); }
+    if (dx > 30) sw.li.classList.remove('open');
+  }
+}, {passive: true});
+$('#watching-list').addEventListener('touchend', () => { sw = null; }, {passive: true});
 
 /* ---------- search ---------- */
 const q = $('#q');
